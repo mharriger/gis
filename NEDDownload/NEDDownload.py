@@ -33,8 +33,7 @@ def convertNED(gridsq):
     #Convert to feet
     subprocess.call('gdal_calc.py -A {0}_nad83.tif --outfile={0}_ft.tif --calc="A/.3048"'.format(gridsq), shell=True)
 
-def loadNEDToPostgis(filename, overviewlist, createTable=False):
-    print filename
+def loadRasterToPostgis(filename, tablename, colname, overviewlist, createTable=False):
     args = ['raster2pgsql']
     if createTable:
         args.append('-d')
@@ -46,29 +45,54 @@ def loadNEDToPostgis(filename, overviewlist, createTable=False):
     args.extend(['-t', '256x256']) #Tile size
     if overviewlist:
         args.extend(['-l', ",".join(overviewlist)])
-    args.extend(['-f', 'dem'])
+    args.extend(['-f', colname])
     args.append(filename)
-    args.append('public.usgs_dem_13')
+    args.append(tablename)
     print args
     r2pproc = subprocess.Popen(args, stdout=subprocess.PIPE)
     psqlproc = subprocess.Popen(['psql', '-h', '10.0.1.91', '-U', 'postgres', 'gis'], stdin = r2pproc.stdout) 
     r2pproc.stdout.close()
     psqlproc.wait()
 
+def loadShapefileToPostgis(filename, tablename, colname, overviewlist, createTable=False):
+    args = ['shp2pgsql']
+    if createTable:
+        args.append('-d')
+        args.append('-I')
+    else:
+        args.append('-a')
+    args.extend(['-g', colname])
+    args.extend(['-s', 'EPSG:3857'])
+    args.append(filename)
+    args.append(tablename)
+    print args
+    r2pproc = subprocess.Popen(args, stdout=subprocess.PIPE)
+    psqlproc = subprocess.Popen(['psql', '-h', '10.0.1.91', '-U', 'postgres', 'gis'], stdin = r2pproc.stdout) 
+    r2pproc.stdout.close()
+    psqlproc.wait()
+
+def createHillshade(demFilename, outFilename):
+    subprocess.call(['gdaldem', 'hillshade', '-s', '3.28084', demFilename, outFilename])
+
+def createContour(demFilename, outFilename, interval):
+    subprocess.call(['gdal_contour', '-a', 'elev', '-i', str(interval), demFilename, outFilename])
 
 if __name__ == '__main__':
     if len(sys.argv) < 5:
         raise Exception("Not enough arguments")
     else:
         fileList = DownloadNED(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
-        makeDemTable = True
-#TODO: Need to load DEM rasters before reprojection
         for fname in fileList:
             print fname
             gridsq = fname[2:].split('.')[0]
             subprocess.call(['unzip', fname, '-d', fname[:-4]])
             convertNED(gridsq)
-            loadNEDToPostgis("{0}_ft.tif".format(gridsq), None, makeDemTable)
-            makeDemTable = False
+        subprocess.call(['gdalbuildvrt', '*ft.tif', 'dem.vrt'])
+        subprocess.call(['gdalwarp', '-t_srs', 'EPSG:3857', '-r', 'bilinear', 'dem.vrt', 'dem_3857.tif']) 
+        createHillshade('dem_3857.tif', 'hillshade.tif')
+        createContour('dem_3857.tif', 'contour.shp', 20)
+        loadRasterToPostgis('hillshade.tif', 'hillshade_3857', 'rast', None, True)
+        loadShapefileToPostgis('contour', 'contour_3857', 'contour_geom', None, True)
+        
             
 
