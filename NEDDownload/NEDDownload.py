@@ -81,7 +81,7 @@ if __name__ == '__main__':
     if len(sys.argv) < 5:
         raise Exception("Not enough arguments")
     else:
-        #TODO: Download OSM data: http://download.geofabrik.de/north-america/us-midwest-latest.osm.pbf
+        #TODO: Download OSM data: http://overpass-api.de/api/map?bbox=-97.000,40.000,-95.000,43.000
         #TODO: Download NHD
         #TODO: Download NLCD landcover data
         fileList = DownloadNED(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
