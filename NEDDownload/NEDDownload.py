@@ -128,4 +128,5 @@ if __name__ == '__main__':
 
         #loadRasterToPostgis('hillshade.tif', 'hillshade_3857', 'rast', None, True)
         #loadShapefileToPostgis('contour', 'contour_3857', 'contour_geom', None, True)
+        #osm2pgsql.exe -s -U postgres -d gis -S default.style -W map.osm
         
